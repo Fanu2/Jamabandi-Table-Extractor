@@ -17,22 +17,21 @@ def extract_tables_from_pdf(file):
     if len(tables) > 1:
         first_cols = tables[0].columns
         can_join = all(list(t.columns) == list(first_cols) for t in tables)
-        
         if can_join:
             merged_df = pd.concat(tables, ignore_index=True)
-            return [merged_df]   # return as single table in list
+            return [merged_df]
     return tables
 
 def table_to_docx(df, filename="table.docx"):
     doc = Document()
-    table = doc.add_table(rows=df.shape[0]+1, cols(df.shape[1]))
+    table = doc.add_table(rows=df.shape[0] + 1, cols=df.shape[1])
+    # Header
     for j, column in enumerate(df.columns):
         table.cell(0, j).text = column
-
+    # Data
     for i in range(df.shape[0]):
         for j in range(df.shape[1]):
             table.cell(i+1, j).text = str(df.iloc[i, j])
-
     buf = io.BytesIO()
     doc.save(buf)
     buf.seek(0)
@@ -51,16 +50,16 @@ if uploaded_file:
         st.error("No tables found in PDF. Check if PDF has proper grid lines.")
     else:
         st.success(f"Extracted {len(tables)} table(s). (Merged into one if possible)")
-
         selected_df = tables[0]
+
         st.subheader("Preview of Table")
         st.dataframe(selected_df)
 
-        # Download CSV
+        # Download buttons
         csv_data = selected_df.to_csv(index=False).encode('utf-8')
-        st.download_button("Download CSV", csv_data, file_name="table.csv", mime="text/csv")
+        st.download_button("Download CSV", csv_data,
+                           file_name="table.csv", mime="text/csv")
 
-        # Download Excel
         excel_buf = io.BytesIO()
         selected_df.to_excel(excel_buf, index=False)
         excel_buf.seek(0)
@@ -68,7 +67,6 @@ if uploaded_file:
                            file_name="table.xlsx",
                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-        # Download DOCX
         docx_buf = table_to_docx(selected_df, filename="table.docx")
         st.download_button("Download DOCX", docx_buf.getvalue(),
                            file_name="table.docx",
