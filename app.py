@@ -4,7 +4,7 @@ import pandas as pd
 from docx import Document
 import io
 
-# Add fix_duplicate_columns helper first
+# Optional helper if needed later
 def fix_duplicate_columns(df):
     new_cols = []
     counts = {}
@@ -18,7 +18,6 @@ def fix_duplicate_columns(df):
     df.columns = new_cols
     return df
 
-
 def extract_tables_from_pdf(file):
     tables = []
     with pdfplumber.open(file) as pdf:
@@ -26,7 +25,6 @@ def extract_tables_from_pdf(file):
             extracted = page.extract_tables()
             for tbl in extracted:
                 df = pd.DataFrame(tbl[1:], columns=tbl[0])
-                df = fix_duplicate_columns(df)    # keep fix here too
                 tables.append(df)
     return tables
 
@@ -54,27 +52,36 @@ if uploaded_file:
         st.error("No tables found in PDF. Check if PDF has proper grid lines.")
     else:
         st.success(f"Found {len(tables)} table(s) in the PDF.")
-        
-        # ADD COMBINE MASTER OPTION:
+
+        # COMBINE ALL TABLES
         if len(tables) > 1:
             if st.checkbox("Combine all tables into one master table"):
-                master_df = pd.concat(tables, ignore_index=True)
-                master_df = fix_duplicate_columns(master_df)
+                master_cols = tables[0].columns
+                cleaned_tables = []
+                for tbl in tables:
+                    # align columns to first table
+                    if list(tbl.columns) != list(master_cols):
+                        try:
+                            tbl.columns = master_cols
+                        except:
+                            tbl = tbl.reindex(columns=master_cols)
+                    cleaned_tables.append(tbl)
+
+                master_df = pd.concat(cleaned_tables, ignore_index=True)
                 st.markdown("#### Master Table Preview:")
                 st.dataframe(master_df)
-                
-                # Download master as CSV
+
                 csv_all = master_df.to_csv(index=False).encode('utf-8')
                 st.download_button("Download Master CSV", csv_all, file_name="master_table.csv")
-                
-                # Download master as Excel
+
                 excel_all_buf = io.BytesIO()
                 master_df.to_excel(excel_all_buf, index=False)
                 excel_all_buf.seek(0)
                 st.download_button("Download Master Excel", excel_all_buf.getvalue(), file_name="master_table.xlsx")
+
                 st.markdown("---")
 
-        # Existing table selection block (unchanged)
+        # Single-table handling
         index = st.selectbox("Select Table to View or Export",
                              list(range(1, len(tables)+1)),
                              format_func=lambda x: f"Table {x}")
